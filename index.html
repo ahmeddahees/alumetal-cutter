@@ -200,7 +200,14 @@
   .alum-print .alum-profile { margin: 6px 0 !important; padding: 6px 10px !important; box-shadow: none !important; break-inside: avoid; page-break-inside: avoid; }
   .alum-print .alum-profile h3 { font-size: 13px; margin: 2px 0; }
   .alum-print .alum-caption, .alum-print p { font-size: 10.5px; margin: 2px 0; }
-  .alum-print .alum-bar { padding: 3px 0 !important; font-size: 11.5px; }
+  .alum-print .alum-bar { padding: 2px 0 !important; font-size: 11px; }
+  .alum-print .alum-facts { gap: 4px !important; margin: 2px 0 !important; }
+  .alum-print .alum-fact { padding: 2px 8px !important; }
+  .alum-print .alum-fact .alum-v { font-size: 12px !important; }
+  .alum-print .alum-fact .alum-k { font-size: 9.5px !important; }
+  .alum-print .alum-profile table { font-size: 10.5px; margin: 2px 0 !important; }
+  .alum-print .alum-profile th, .alum-print .alum-profile td { padding: 2px 6px !important; }
+  .alum-print .alum-total-grand b { font-size: 16px !important; }
 }
 </style>
 </head>
@@ -929,9 +936,6 @@ function alumBuildPrintArea() {
     copy.removeAttribute('id');
     var gl = copy.querySelectorAll('.alum-glass');
     for (var i = 0; i < gl.length; i++) gl[i].parentNode.removeChild(gl[i]);
-    // من غير جداول القطع ولا بلوكات الأرقام لكل قطاع: الإجماليات وعدد الأعواد وتوزيع القص بس
-    var rm = copy.querySelectorAll('.alum-profile .alum-facts, .alum-profile table');
-    for (var j = 0; j < rm.length; j++) rm[j].parentNode.removeChild(rm[j]);
     host.appendChild(copy);
   }
 }
