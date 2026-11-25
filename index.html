@@ -846,6 +846,7 @@ function alumGlassSection(host, glass) {
   if (!glass.length) return;
   var box = alumEl('div', 'alum-profile');
   var head = alumEl('div', 'alum-profile-head');
+  box.className += ' alum-glass';
   head.appendChild(alumEl('h3', null, 'مقاسات الزجاج'));
   var badge = alumEl('span', 'alum-count-badge', 'مرجع بس');
   badge.style.background = '#8a8a8a';
@@ -1015,8 +1016,19 @@ function alumDrawUnitSvg(it, view) {
     if (I.bad.length) {
       label(W / 2, H / 2, 'تعارض في المقاسات', 12, '#a02020');
     } else if (I.pa > 0) {
-      // فيه فواصل: مكان الأرفف والأدراج مش معروف، فمش بنرسمها في مكان محدد
-      if (I.shelves.length || I.drawers.length) label(W / 2, H - c - 6, 'الأرفف والأدراج مذكورة تحت (المكان غير محدد)', 8, '#8a817e');
+      // فيه فواصل: ترتيب توضيحي جوه قسم واحد (الأقرب لليمين). مش بمقياس ومش مكان حقيقي، والرقم المكتوب هو المقاس.
+      var cw = (W - 2 * c) / (I.pa + 1), cx = W - c - cw, ny = I.drawers.length, bandH2 = ny ? (H - 2 * c) * 0.5 : 0, dh2 = ny ? bandH2 / ny : 0;
+      I.drawers.forEach(function (dw, idx) {
+        var ry = H - c - bandH2 + idx * dh2;
+        g.appendChild(alumSvg('rect', { x: cx + 3, y: ry + 1, width: cw - 6, height: dh2 - 2, fill: 'rgba(79,143,123,.18)', stroke: teal, 'stroke-width': 1 }));
+        label(cx + cw / 2, ry + dh2 / 2 + 3, 'درج ' + alumLtr(alumFmt(dw)), Math.max(7, Math.min(10, cw / 6)), teal);
+      });
+      var topH2 = H - 2 * c - bandH2;
+      I.shelves.forEach(function (sw, idx) {
+        var y3 = c + topH2 * (idx + 1) / (I.shelves.length + 1);
+        g.appendChild(alumSvg('line', { x1: cx + 3, y1: y3, x2: cx + cw - 3, y2: y3, stroke: ink, 'stroke-width': 2 }));
+        label(cx + cw / 2, y3 - 4, 'رف ' + alumLtr(alumFmt(sw)), Math.max(7, Math.min(10, cw / 6)), ink);
+      });
     } else {
       var n = I.drawers.length, bandH = n ? (H - 2 * c) * 0.55 : 0, dh = n ? bandH / n : 0;
       I.drawers.forEach(function (dw, idx) {
@@ -1079,7 +1091,7 @@ function alumDrawingsInto(host) {
     var cf = alumConflicts(it);
     if (cf.length) card.appendChild(alumEl('div', 'alum-danger', 'تحذير: المقاسات دي متعارضة مع مقاس الوحدة فمفيش رسم ليها. راجع المدخلات: ' + cf.join(' ؛ ')));
     var sm = alumInsideSummary(it);
-    if (sm.text) card.appendChild(alumEl('div', 'alum-caption', 'من جوه: ' + sm.text + (sm.I.pa > 0 ? ' (الوحدة فيها فواصل، مكان الرف أو الدرج مش محدد)' : ' (الترتيب تخطيطي، المقاس الحقيقي هو المكتوب)')));
+    if (sm.text) card.appendChild(alumEl('div', 'alum-caption', 'من جوه: ' + sm.text + (sm.I.pa > 0 ? ' (الوحدة فيها فواصل: الرف والدرج مرسومين تخطيطيًا في قسم واحد، مش بمقياس ولا في مكانهم الحقيقي)' : ' (الترتيب تخطيطي، المقاس الحقيقي هو المكتوب)')));
     if (it.d > 0) card.appendChild(alumEl('div', 'alum-caption', 'العمق: ' + alumLtr(alumFmt(it.d)) + ' سم'));
     host.appendChild(card);
   });
@@ -1104,32 +1116,18 @@ function alumRefreshDrawings() {
   }
 }
 function alumBuildPrintArea() {
+  // PDF: الإجماليات وعدد الأعواد وتوزيع القص بس. من غير جدول وحدات ولا رسم ولا زجاج.
   var host = document.getElementById('alum-print');
   host.innerHTML = '';
   var now = new Date();
-  host.appendChild(alumEl('h1', null, 'حاسبة تقطيعات مطبخ الألوميتال'));
+  host.appendChild(alumEl('h1', null, 'نتايج التقطيع'));
   host.appendChild(alumEl('div', 'alum-caption', 'التاريخ: ' + now.getFullYear() + '/' + (now.getMonth() + 1) + '/' + now.getDate()));
-  var list = alumUnitList();
-  if (list.length) {
-    host.appendChild(alumEl('h2', null, 'الوحدات'));
-    var tbl = alumEl('table', 'alum-table');
-    var hr = alumEl('tr');
-    ['الوحدة', 'العرض', 'الارتفاع', 'العمق', 'فواصل', 'ضلف (إجمالي القطع)', 'أرفف (إجمالي القطع)', 'أدراج (إجمالي القطع)'].forEach(function (t) { hr.appendChild(alumEl('th', null, t)); });
-    tbl.appendChild(hr);
-    list.forEach(function (it) {
-      var tr = alumEl('tr');
-      [it.name, alumFmt(it.w), alumFmt(it.h), it.d > 0 ? alumFmt(it.d) : '-', alumCount(it.u.partitions),
-       alumSumQty(it.u.doors), alumSumQty(it.u.shelves), alumSumQty(it.u.drawers)].forEach(function (t) { tr.appendChild(alumEl('td', null, String(t))); });
-      tbl.appendChild(tr);
-    });
-    host.appendChild(tbl);
-    host.appendChild(alumEl('h2', null, 'رسم الوحدات (تقريبي)'));
-    alumDrawingsInto(host);
-  }
   var res = document.getElementById('alum-results');
   if (res && res.childNodes.length) {
     var copy = res.cloneNode(true);
     copy.removeAttribute('id');
+    var gl = copy.querySelectorAll('.alum-glass');
+    for (var i = 0; i < gl.length; i++) gl[i].parentNode.removeChild(gl[i]);
     host.appendChild(copy);
   }
 }
