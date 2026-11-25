@@ -184,10 +184,6 @@
   .alum-app h1 { font-size: 21px; }
   .alum-total-grand b { font-size: 20px; }
 }
-.alum-draw-card { border: 1px solid var(--hairline); border-radius: 14px; padding: 12px 14px; margin: 14px 0; background: #fff; break-inside: avoid; page-break-inside: avoid; }
-.alum-draw-row { display: flex; flex-wrap: wrap; gap: 12px; }
-.alum-draw-col { flex: 1 1 260px; min-width: 0; }
-.alum-draw-svg { display: block; margin: 0 auto; }
 .alum-print { display: none; }
 .alum-table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 8px 0; }
 .alum-table th, .alum-table td { border: 1px solid var(--hairline); padding: 4px 8px; text-align: center; }
@@ -199,6 +195,12 @@
   .alum-print button { display: none !important; }
   .alum-print h1, .alum-print h2, .alum-print h3 { break-after: avoid; page-break-after: avoid; }
   .alum-print .alum-table tr, .alum-print table tr { break-inside: avoid; }
+  .alum-print h1 { font-size: 18px; margin: 0 0 2px; }
+  .alum-print h2 { font-size: 15px; margin: 8px 0 4px; }
+  .alum-print .alum-profile { margin: 6px 0 !important; padding: 6px 10px !important; box-shadow: none !important; break-inside: avoid; page-break-inside: avoid; }
+  .alum-print .alum-profile h3 { font-size: 13px; margin: 2px 0; }
+  .alum-print .alum-caption, .alum-print p { font-size: 10.5px; margin: 2px 0; }
+  .alum-print .alum-bar { padding: 3px 0 !important; font-size: 11.5px; }
 }
 </style>
 </head>
@@ -227,16 +229,15 @@
   <div id="alum-units"></div>
   <div class="alum-actions">
     <button class="alum-btn-primary" id="alum-add-unit">أضف وحدة</button>
-    <button class="alum-btn-primary" id="alum-draw-btn" type="button">رسم الوحدات (تقريبي)</button>
     <button class="alum-btn-primary" id="alum-pdf-btn" type="button">تصدير PDF</button>
   </div>
-  <div id="alum-drawings" data-open="0"></div>
 
   <h2>شبابيك وأبواب PS صغير</h2>
   <div id="alum-ps"></div>
 
   <div id="alum-results"></div>
   <div class="alum-foot">المقاسات بتتحفظ على جهازك تلقائيًا.</div>
+  <div class="alum-foot" id="alum-page-ver" style="font-size:11px;opacity:.7">نسخة الصفحة: 6</div>
   <div style="text-align:center;color:#8a817e;font-size:12px;padding:6px 0 14px;direction:ltr;">developed by ahmed mohamed dahees</div>
 </div>
 <div class="alum-print" id="alum-print"></div>
@@ -912,209 +913,9 @@ function alumRenderResults() {
   alumProfileSection(host, 'PS صداد', r.psSaddad, 'عود صداد واحد للشباك المفصلي الدرفتين = الارتفاع − 10.4 — من مثالك 100×100، محتاج تأكيدك.', '#b05a70');
   alumProfileSection(host, 'PS قطاع T', r.psT, 'قطعتين بعرض درفة الباب من مثالك 70×200 بس — بيتقصوا وبيتظبطوا على الطبيعة (يصفي للطبيعة) حسب كلامك. أي مقاس باب تاني مستني تأكيد الخصومات.', '#8a7a5a');
   alumGlassSection(host, r.glass);
-  if (typeof alumRefreshDrawings === 'function') alumRefreshDrawings();
 }
 
 // ================== رسم تقريبي + تصدير PDF ==================
-var ALUM_SVG_NS = 'http://www.w3.org/2000/svg';
-function alumSvg(tag, attrs, text) {
-  var e = document.createElementNS(ALUM_SVG_NS, tag);
-  Object.keys(attrs || {}).forEach(function (k) { e.setAttribute(k, attrs[k]); });
-  if (text != null) e.textContent = text;
-  return e;
-}
-function alumLtr(t) { return '\u2066' + t + '\u2069'; }
-function alumSumQty(list) { return (list || []).reduce(function (a, e) { return a + (alumCount(e.qty) || 0); }, 0); }
-function alumUnitList() {
-  var s = alumCurrentSettings(), out = [];
-  alumState.units.forEach(function (u, i) {
-    var w = alumNum(u.width), h = alumNum(u.height), d = alumNum(u.depth);
-    if (w > 0 && h > 0) out.push({ u: u, i: i, name: (u.name || '').trim() || ('وحدة ' + (i + 1)), w: w, h: h, d: d, c: s.connector, s: s });
-  });
-  return out;
-}
-// تخطيط الضلف: صفوف من اليمين لليسار بمقاساتها الحقيقية (من غير تصغير). لو مش داخلة يبقى تعارض.
-function alumLayoutDoors(it) {
-  var doors = [];
-  (it.u.doors || []).forEach(function (d) {
-    var dw = alumNum(d.w), dh = alumNum(d.h), n = alumCount(d.qty);
-    for (var q = 0; q < n && dw > 0 && dh > 0; q++) doors.push({ w: dw, h: dh, t: d.t });
-  });
-  var rows = [], cur = null, bad = [];
-  doors.forEach(function (d) {
-    if (d.w > it.w + 0.01) bad.push('قطعة عرضها ' + alumFmt(d.w) + ' أكبر من عرض الوحدة ' + alumFmt(it.w));
-    if (!cur || cur.w + d.w > it.w + 0.01) { cur = { w: 0, h: 0, items: [] }; rows.push(cur); }
-    cur.items.push(d); cur.w += d.w; if (d.h > cur.h) cur.h = d.h;
-  });
-  var totH = rows.reduce(function (a, r) { return a + r.h; }, 0);
-  if (totH > it.h + 0.01) bad.push('ارتفاع القطع مجمّعة (' + alumFmt(totH) + ') أكبر من ارتفاع الوحدة ' + alumFmt(it.h));
-  doors.forEach(function (d) { if (d.h > it.h + 0.01) bad.push('قطعة ارتفاعها ' + alumFmt(d.h) + ' أكبر من ارتفاع الوحدة ' + alumFmt(it.h)); });
-  return { doors: doors, rows: rows, totH: totH, bad: bad };
-}
-function alumCollectInside(it) {
-  var shelves = [], drawers = [], bad = [];
-  (it.u.shelves || []).forEach(function (s) {
-    var sw = alumNum(s.w), n = alumCount(s.qty);
-    for (var q = 0; q < n && sw > 0; q++) shelves.push(sw);
-  });
-  (it.u.drawers || []).forEach(function (d) {
-    var dw = alumNum(d.w), n = alumCount(d.qty);
-    for (var q = 0; q < n && dw > 0; q++) drawers.push(dw);
-  });
-  var pa = alumCount(it.u.partitions);
-  var inner = it.w - 2 * it.c;
-  shelves.forEach(function (w) { if (w > inner + 0.5) bad.push('رف ' + alumFmt(w) + ' أكبر من العرض الداخلي للوحدة (' + alumFmt(inner) + ')'); });
-  drawers.forEach(function (w) { if (w > inner + 0.5) bad.push('درج ' + alumFmt(w) + ' أكبر من العرض الداخلي للوحدة (' + alumFmt(inner) + ')'); });
-  return { shelves: shelves, drawers: drawers, pa: pa, bad: bad };
-}
-function alumConflicts(it) {
-  var a = alumLayoutDoors(it).bad.concat(alumCollectInside(it).bad);
-  var seen = {}, out = [];
-  a.forEach(function (m) { if (!seen[m]) { seen[m] = 1; out.push(m); } });
-  return out;
-}
-// view: 'front' (ضلف) أو 'inside' (فواصل + أرفف + أدراج)
-function alumDrawUnitSvg(it, view) {
-  var maxW = 300, maxH = 250;
-  var k = Math.min(maxW / it.w, maxH / it.h);
-  var W = it.w * k, H = it.h * k, c = Math.min(it.c * k, W / 4, H / 4);
-  var mL = 38, mT = 32, mB = 14, mR = 10;
-  var svg = alumSvg('svg', { viewBox: '0 0 ' + (W + mL + mR) + ' ' + (H + mT + mB), width: '100%', 'class': 'alum-draw-svg', role: 'img' });
-  svg.style.maxWidth = (W + mL + mR) * 1.25 + 'px';
-  var g = alumSvg('g', { transform: 'translate(' + mL + ',' + mT + ')' });
-  var ink = '#26201f', teal = '#2e5b4f', amber = '#b9722f';
-  g.appendChild(alumSvg('rect', { x: 0, y: 0, width: W, height: H, fill: '#fff', stroke: ink, 'stroke-width': 1.6 }));
-  function label(x, y, t, size, color) {
-    var tx = alumSvg('text', { x: x, y: y, 'text-anchor': 'middle', 'font-size': size || 9, fill: color || ink, 'font-family': 'Tahoma, Arial, sans-serif' }, t);
-    g.appendChild(tx);
-  }
-  if (view === 'front') {
-    var L = alumLayoutDoors(it);
-    if (L.bad.length) {
-      label(W / 2, H / 2, 'تعارض في المقاسات', 12, '#a02020');
-    } else {
-      var y = (H - L.totH * k) / 2;
-      L.rows.forEach(function (r) {
-        var x = W - (it.w - r.w) * k / 2;
-        r.items.forEach(function (d) {
-          var rw = d.w * k, rh = d.h * k;
-          x -= rw;
-          g.appendChild(alumSvg('rect', { x: x, y: y, width: rw, height: rh, fill: 'rgba(217,138,78,.22)', stroke: amber, 'stroke-width': 1.1 }));
-          label(x + rw / 2, y + rh / 2 + 3, alumLtr(alumFmt(d.w) + '×' + alumFmt(d.h)), Math.max(8, Math.min(12, rw / 3.6, rh / 1.6)), amber);
-        });
-        y += r.h * k;
-      });
-      if (!L.doors.length) label(W / 2, H / 2, 'مفيش ضلف', 9, '#8a817e');
-    }
-  } else {
-    var I = alumCollectInside(it);
-    g.appendChild(alumSvg('rect', { x: c, y: c, width: W - 2 * c, height: H - 2 * c, fill: 'none', stroke: '#9aa5a0', 'stroke-width': 0.7 }));
-    for (var p = 1; p <= I.pa; p++) {
-      var px = W * p / (I.pa + 1);
-      g.appendChild(alumSvg('line', { x1: px, y1: c, x2: px, y2: H - c, stroke: teal, 'stroke-width': 1.2, 'stroke-dasharray': '4 3' }));
-    }
-    if (I.bad.length) {
-      label(W / 2, H / 2, 'تعارض في المقاسات', 12, '#a02020');
-    } else if (I.pa > 0) {
-      // فيه فواصل: ترتيب توضيحي جوه قسم واحد (الأقرب لليمين). مش بمقياس ومش مكان حقيقي، والرقم المكتوب هو المقاس.
-      var cw = (W - 2 * c) / (I.pa + 1), cx = W - c - cw, ny = I.drawers.length, bandH2 = ny ? (H - 2 * c) * 0.5 : 0, dh2 = ny ? bandH2 / ny : 0;
-      I.drawers.forEach(function (dw, idx) {
-        var ry = H - c - bandH2 + idx * dh2;
-        g.appendChild(alumSvg('rect', { x: cx + 3, y: ry + 1, width: cw - 6, height: dh2 - 2, fill: 'rgba(79,143,123,.18)', stroke: teal, 'stroke-width': 1 }));
-        label(cx + cw / 2, ry + dh2 / 2 + 3, 'درج ' + alumLtr(alumFmt(dw)), Math.max(7, Math.min(10, cw / 6)), teal);
-      });
-      var topH2 = H - 2 * c - bandH2;
-      I.shelves.forEach(function (sw, idx) {
-        var y3 = c + topH2 * (idx + 1) / (I.shelves.length + 1);
-        g.appendChild(alumSvg('line', { x1: cx + 3, y1: y3, x2: cx + cw - 3, y2: y3, stroke: ink, 'stroke-width': 2 }));
-        label(cx + cw / 2, y3 - 4, 'رف ' + alumLtr(alumFmt(sw)), Math.max(7, Math.min(10, cw / 6)), ink);
-      });
-    } else {
-      var n = I.drawers.length, bandH = n ? (H - 2 * c) * 0.55 : 0, dh = n ? bandH / n : 0;
-      I.drawers.forEach(function (dw, idx) {
-        var rw = dw * k, rx = (W - rw) / 2, ry = H - c - bandH + idx * dh;
-        g.appendChild(alumSvg('rect', { x: rx, y: ry + 1, width: rw, height: dh - 2, fill: 'rgba(79,143,123,.18)', stroke: teal, 'stroke-width': 1 }));
-        label(W / 2, ry + dh / 2 + 3, 'درج ' + alumLtr(alumFmt(dw)), 11, teal);
-      });
-      var topH = H - 2 * c - bandH;
-      I.shelves.forEach(function (sw, idx) {
-        var y2 = c + topH * (idx + 1) / (I.shelves.length + 1);
-        var rw = sw * k, rx = (W - rw) / 2;
-        g.appendChild(alumSvg('line', { x1: rx, y1: y2, x2: rx + rw, y2: y2, stroke: ink, 'stroke-width': 2 }));
-        label(W / 2, y2 - 5, 'رف ' + alumLtr(alumFmt(sw)), 11, ink);
-      });
-    }
-    if (!I.drawers.length && !I.shelves.length && !I.pa) label(W / 2, H / 2, 'وحدة فاضية', 9, '#8a817e');
-  }
-  function arrow(x1, y1, x2, y2) { g.appendChild(alumSvg('line', { x1: x1, y1: y1, x2: x2, y2: y2, stroke: '#5c5452', 'stroke-width': 0.8, 'marker-start': 'url(#alum-ar)', 'marker-end': 'url(#alum-ar)' })); }
-  arrow(0, -12, W, -12);
-  label(W / 2, -16, alumLtr(alumFmt(it.w)) + ' سم', 12, '#26201f');
-  arrow(-12, 0, -12, H);
-  var vt = alumSvg('text', { x: -16, y: H / 2, 'text-anchor': 'middle', 'font-size': 12, fill: ink, 'font-family': 'Tahoma, Arial, sans-serif', transform: 'rotate(-90 -16 ' + H / 2 + ')' }, alumLtr(alumFmt(it.h)) + ' سم');
-  g.appendChild(vt);
-  var defs = alumSvg('defs');
-  var mk = alumSvg('marker', { id: 'alum-ar', viewBox: '0 0 6 6', refX: 3, refY: 3, markerWidth: 5, markerHeight: 5, orient: 'auto-start-reverse' });
-  mk.appendChild(alumSvg('path', { d: 'M0,0 L6,3 L0,6 z', fill: '#5c5452' }));
-  defs.appendChild(mk);
-  svg.appendChild(defs);
-  svg.appendChild(g);
-  return svg;
-}
-function alumInsideSummary(it) {
-  var I = alumCollectInside(it), parts = [];
-  function grp(arr, name) {
-    var m = {}, ks = [];
-    arr.forEach(function (w) { if (!m[w]) { m[w] = 0; ks.push(w); } m[w]++; });
-    ks.forEach(function (w) { parts.push(name + ' ' + alumLtr(alumFmt(w)) + ' سم × ' + m[w]); });
-  }
-  grp(I.shelves, 'رف'); grp(I.drawers, 'درج');
-  return { I: I, text: parts.join(' ، ') };
-}
-function alumDrawingsInto(host) {
-  var list = alumUnitList();
-  if (!list.length) {
-    host.appendChild(alumEl('p', 'alum-caption', 'اكتب عرض وارتفاع وحدة واحدة على الأقل عشان يترسم.'));
-    return;
-  }
-  list.forEach(function (it) {
-    var card = alumEl('div', 'alum-draw-card');
-    var ttl = alumEl('h3', null, it.name + ' — ');
-    var dimsEl = alumEl('span', null, alumFmt(it.w) + ' × ' + alumFmt(it.h) + (it.d > 0 ? ' × ' + alumFmt(it.d) : ''));
-    dimsEl.setAttribute('dir', 'ltr'); dimsEl.style.unicodeBidi = 'isolate';
-    ttl.appendChild(dimsEl); ttl.appendChild(document.createTextNode(' سم'));
-    card.appendChild(ttl);
-    var row = alumEl('div', 'alum-draw-row');
-    var a = alumEl('div', 'alum-draw-col'); a.appendChild(alumEl('div', 'alum-caption', 'واجهة (الضلف)')); a.appendChild(alumDrawUnitSvg(it, 'front'));
-    var b = alumEl('div', 'alum-draw-col'); b.appendChild(alumEl('div', 'alum-caption', 'من جوه (فواصل وأرفف وأدراج)')); b.appendChild(alumDrawUnitSvg(it, 'inside'));
-    row.appendChild(a); row.appendChild(b);
-    card.appendChild(row);
-    var cf = alumConflicts(it);
-    if (cf.length) card.appendChild(alumEl('div', 'alum-danger', 'تحذير: المقاسات دي متعارضة مع مقاس الوحدة فمفيش رسم ليها. راجع المدخلات: ' + cf.join(' ؛ ')));
-    var sm = alumInsideSummary(it);
-    if (sm.text) card.appendChild(alumEl('div', 'alum-caption', 'من جوه: ' + sm.text + (sm.I.pa > 0 ? ' (الوحدة فيها فواصل: الرف والدرج مرسومين تخطيطيًا في قسم واحد، مش بمقياس ولا في مكانهم الحقيقي)' : ' (الترتيب تخطيطي، المقاس الحقيقي هو المكتوب)')));
-    if (it.d > 0) card.appendChild(alumEl('div', 'alum-caption', 'العمق: ' + alumLtr(alumFmt(it.d)) + ' سم'));
-    host.appendChild(card);
-  });
-  host.appendChild(alumEl('div', 'alum-danger', 'رسم تخطيطي للتوضيح بس: ترتيب القطع وأماكنها مش من المدخلات، والأرقام المكتوبة هي اللي دخلتها وحدها. لو قطعة مش داخلة في الوحدة بيظهر تحذير بدل الرسم. مش مخطط تنفيذ، راجع على الطبيعة قبل القص.'));
-}
-function alumToggleDrawings() {
-  var host = document.getElementById('alum-drawings');
-  var btn = document.getElementById('alum-draw-btn');
-  if (host.getAttribute('data-open') === '1') {
-    host.innerHTML = ''; host.setAttribute('data-open', '0'); btn.textContent = 'رسم الوحدات (تقريبي)'; return;
-  }
-  host.innerHTML = '';
-  host.appendChild(alumEl('h2', null, 'رسم الوحدات (تقريبي)'));
-  alumDrawingsInto(host);
-  host.setAttribute('data-open', '1'); btn.textContent = 'إخفاء الرسم';
-  host.scrollIntoView();
-}
-function alumRefreshDrawings() {
-  var host = document.getElementById('alum-drawings');
-  if (host && host.getAttribute('data-open') === '1') {
-    host.innerHTML = ''; host.appendChild(alumEl('h2', null, 'رسم الوحدات (تقريبي)')); alumDrawingsInto(host);
-  }
-}
 function alumBuildPrintArea() {
   // PDF: الإجماليات وعدد الأعواد وتوزيع القص بس. من غير جدول وحدات ولا رسم ولا زجاج.
   var host = document.getElementById('alum-print');
@@ -1128,6 +929,9 @@ function alumBuildPrintArea() {
     copy.removeAttribute('id');
     var gl = copy.querySelectorAll('.alum-glass');
     for (var i = 0; i < gl.length; i++) gl[i].parentNode.removeChild(gl[i]);
+    // من غير جداول القطع ولا بلوكات الأرقام لكل قطاع: الإجماليات وعدد الأعواد وتوزيع القص بس
+    var rm = copy.querySelectorAll('.alum-profile .alum-facts, .alum-profile table');
+    for (var j = 0; j < rm.length; j++) rm[j].parentNode.removeChild(rm[j]);
     host.appendChild(copy);
   }
 }
@@ -1161,7 +965,6 @@ function alumStart() {
     alumState.units.push({ name: 'وحدة ' + (alumState.units.length + 1), width: '', height: '', depth: '', partitions: '0', doors: [], shelves: [], drawers: [], collapsed: false });
     alumSave(); alumRenderUnits(); alumRenderResults();
   });
-  document.getElementById('alum-draw-btn').addEventListener('click', alumToggleDrawings);
   document.getElementById('alum-pdf-btn').addEventListener('click', alumExportPdf);
   alumRenderUnits();
   alumRenderPs();
