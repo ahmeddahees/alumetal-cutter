@@ -246,7 +246,7 @@
 
   <div id="alum-results"></div>
   <div class="alum-foot">المقاسات بتتحفظ على جهازك تلقائيًا.</div>
-  <div class="alum-foot" id="alum-page-ver" style="font-size:11px;opacity:.7">نسخة الصفحة: 6</div>
+  <div class="alum-foot" id="alum-page-ver" style="font-size:11px;opacity:.7">نسخة الصفحة: 8</div>
   <div style="text-align:center;color:#8a817e;font-size:12px;padding:6px 0 14px;direction:ltr;">developed by ahmed mohamed dahees</div>
 </div>
 <div class="alum-print" id="alum-print"></div>
@@ -365,13 +365,14 @@ function alumCompute(state, s) {
   });
 
   // ================== شبابيك وأبواب PS صغير (أعواد 6 متر) ==================
-  var psFrameSlide = [], psFrameStd = [], psFrameRev = [], psSashSlide = [], psSashClosed = [], psSashOpen = [], psKnife = [], psScreen = [], psSaddad = [], psT = [], glass = [];
+  var psFrameSlide = [], psFrameStd = [], psFrameRev = [], psSashSlide = [], psSashClosed = [], psSashOpen = [], psKnife = [], psScreen = [], psSaddad = [], psT = [], psSashZOpen = [], psPandaZClosed = [], psScreenFixed = [], psBakita = [], psJalsa = [], glass = [];
   var sc = s.screenQty > 0 ? s.screenQty : 0; // عدد دلف السلك لكل شباك جرار (افتراضي 1 من الإعدادات)
   (state.ps || []).forEach(function (p) {
     var w = alumNum(p.w), h = alumNum(p.h), n = alumCount(p.qty);
     if (!(w > 0 && h > 0 && n > 0)) return; // صف ناقص لسه بيتكتب
     var kindName = ALUM_PS_KINDS[p.kind] || 'شباك';
     if (p.kind === 'hinge') kindName += p.sashes === '1' ? ' درفة واحدة' : ' درفتين';
+    if (p.kind === 'hinge' && p.panda === 'yes') kindName += ' باندا';
     if (p.kind === 'door') kindName += p.frame === 'rev' ? ' حلق مقلوب' : ' حلق معدول';
     var nm = kindName + ' ' + alumFmt(w) + '×' + alumFmt(h);
 
@@ -404,21 +405,48 @@ function alumCompute(state, s) {
       frameArr.push({ unit: nm, label: 'حلق: عرض (+12 تخصيم)', len: w + 12, qty: 2 * n });
       frameArr.push({ unit: nm, label: 'حلق: ارتفاع (+12 تخصيم)', len: h + 12, qty: 2 * n });
       if (two && (w !== 100 || h !== 100)) {
-        pending.push(nm + ' (عدد ' + n + '): دلفة وصداد وزجاج المفصلي الدرفتين متثبتين للمثال 100×100 بس — المقاس ده مستني تأكيد الخصومات، فمش داخلين في النتايج. (الحلق اتحسب وداخل في التوتال عادي.)');
+        pending.push(nm + ' (عدد ' + n + '): دلفة وصداد وزجاج المفصلي الدرفتين' + (p.panda === 'yes' ? ' والباندا' : '') + ' متثبتين للمثال 100×100 بس — المقاس ده مستني تأكيد الخصومات، فمش داخلين في النتايج. (الحلق اتحسب وداخل في التوتال عادي.)');
         return;
       }
       var hw = two ? (w - 4.8) / 2 : w - 4.2;
       var hh = h - 4.2;
       var sad = h - 10.4;
       var gw = hw - 9.4, gh = hh - 9.4;
+      var panda = p.panda === 'yes';
+      // خصم الباندا = الدرفة − 7.7 (تعديل أحمد 27 نوفمبر بدل 10.9)، والزجاج والسلك الثابت والباكيتا بيتحسبوا من مقاس الباندا الجديد بنفس قواعدهم.
+      var PANDA_DEDUCT = 7.7;
       if (hw <= 0 || hh <= 0 || (two && sad <= 0) || ((two || (w === 50 && h === 100)) && (gw <= 0 || gh <= 0))) {
         invalid.push(nm + ' اتساب من الحساب: المقاسات بعد الخصم مش موجبة (العرض لازم يبقى أكبر من ' + (two ? '4.8' : '4.2') + ' والارتفاع أكبر من ' + (two ? '10.4' : '4.2') + ' سم)');
         return;
       }
-      sashArr.push({ unit: nm, label: 'درفة: عرض', len: hw, qty: 2 * (two ? 2 : 1) * n });
-      sashArr.push({ unit: nm, label: 'درفة: ارتفاع', len: hh, qty: 2 * (two ? 2 : 1) * n });
+      if (panda && (hw - PANDA_DEDUCT - 9.4 <= 0 || hh - PANDA_DEDUCT - 9.4 <= 0)) {
+        invalid.push(nm + ' اتساب من الحساب: مقاسات الباندا بعد الخصومات مش موجبة (الدرفة لازم تبقى أكبر من ' + alumFmt(alumRound2(PANDA_DEDUCT + 9.4)) + ' سم في الاتجاهين عشان الزجاج)');
+        return;
+      }
+      // باندا (درفة أو درفتين): الدرفة بتتقص من عود دلفة Z مفتوح، والباندا = الدرفة − 7.7 من عود دلفة Z —
+      // والزجاج على الباندا (− 9.4)، والسلك الثابت = الباندا − 1 (عود سلك 6 متر)،
+      // والباكيتا = الباندا − 9 تقريبي (عود 6 متر) — كلهم مؤكدين من كلام أحمد 26 نوفمبر.
+      (panda ? psSashZOpen : sashArr).push({ unit: nm, label: 'درفة: عرض', len: hw, qty: 2 * (two ? 2 : 1) * n });
+      (panda ? psSashZOpen : sashArr).push({ unit: nm, label: 'درفة: ارتفاع', len: hh, qty: 2 * (two ? 2 : 1) * n });
       if (two) psSaddad.push({ unit: nm, label: 'عود صداد', len: sad, qty: n });
-      if (two || (w === 50 && h === 100)) {
+      if (panda) {
+        // كل دلفة ليها الباندا بتاعتها: درفتين = باندا لكل درفة (من كلام أحمد 27 نوفمبر).
+        var sashCount = two ? 2 : 1;
+        var pw = alumRound2(hw - PANDA_DEDUCT), ph = alumRound2(hh - PANDA_DEDUCT);
+        // قطاع الباندا: Z مقفول = العود بيجي بالباكيتا (مفيش حساب باكيتا) — Z مفتوح = الباكيتا بتتحسب (الباندا − 9 تقريبي). من كلام أحمد 26 نوفمبر.
+        // الباندا Z مفتوح هي نفس عود الدرفة بالظبط — بيتقصوا مع بعض على نفس الأعواد عشان نوفر الهدر (طلب أحمد 27 نوفمبر). الباندا Z مقفول ليها عودها لوحدها.
+        var pandaArr = p.pandaZ === 'open' ? psSashZOpen : psPandaZClosed;
+        pandaArr.push({ unit: nm, label: 'باندا: عرض (الدرفة − ' + alumFmt(PANDA_DEDUCT) + ')', len: pw, qty: 2 * sashCount * n });
+        pandaArr.push({ unit: nm, label: 'باندا: ارتفاع (الدرفة − ' + alumFmt(PANDA_DEDUCT) + ')', len: ph, qty: 2 * sashCount * n });
+        glass.push({ unit: nm + ' (على الباندا)', w: alumRound2(pw - 9.4), h: alumRound2(ph - 9.4), qty: sashCount * n });
+        psScreenFixed.push({ unit: nm, label: 'السلك الثابت: عرض (الباندا − 1)', len: alumRound2(pw - 1), qty: 2 * sashCount * n });
+        psScreenFixed.push({ unit: nm, label: 'السلك الثابت: ارتفاع (الباندا − 1)', len: alumRound2(ph - 1), qty: 2 * sashCount * n });
+        if (p.pandaZ === 'open') {
+          // باكيتا الشباك: 2 ارتفاع = ارتفاع الباندا − 9، و2 عرض = عرض الباندا − 9 − 4 (من كلام أحمد 26 نوفمبر، تقريبي). الارتفاع بيتقص الأول.
+          psBakita.push({ unit: nm, label: 'باكيتا: ارتفاع (الباندا − 9) — تقريبي', len: alumRound2(ph - 9), qty: 2 * sashCount * n });
+          psBakita.push({ unit: nm, label: 'باكيتا: عرض (الباندا − 9 − 4) — تقريبي', len: alumRound2(pw - 13), qty: 2 * sashCount * n });
+        }
+      } else if (two || (w === 50 && h === 100)) {
         glass.push({ unit: nm, w: gw, h: gh, qty: (two ? 2 : 1) * n });
       } else {
         pending.push(nm + ' (عدد ' + n + '): خصم الزجاج (الدرفة − 9.4) متثبت للمثال 50×100 بس — الزجاج للمقاس ده مستني تأكيدك، فمش داخل في جدول الزجاج. (الدلفة والحلق اتحسبوا عادي.)');
@@ -442,7 +470,20 @@ function alumCompute(state, s) {
       }
       sashArr2.push({ unit: nm, label: 'دلفة: ارتفاع', len: dh, qty: 2 * n });
       sashArr2.push({ unit: nm, label: 'دلفة: رأس = العرض − 4.2 (مفيش أرضية)', len: dw, qty: n });
-      psT.push({ unit: nm, label: 'قطعة T — يصفي للطبيعة', len: dw, qty: 2 * n });
+      // دلفة مفتوحة: باكيتا (2 ارتفاع و6 عرض، الدلفة − 9 تقريبي) + عود المونيه T لو اختار "يوجد T" (قطعتين، الدلفة − 9 تقريبي).
+      // دلفة مقفولة: مفيش باكيتا ولا T — بيتبدلوا بقطاع "جلسة" (عود 6 متر): قطعتين، واحد في النص وواحد تحت (من كلام أحمد 26 نوفمبر).
+      if (p.sash === 'open') {
+        if (p.t !== 'none') {
+          psT.push({ unit: nm, label: 'عود مونيه T (الدلفة − 9) — تقريبي', len: alumRound2(dw - 9), qty: 2 * n });
+        }
+        // باكيتا الباب: الارتفاع بيتقص الأول. قطعة الأرضية (واحدة) = الدلفة − 9 من غير الـ4، وباقي قطع العرض (5) = الدلفة − 9 − 4 (من كلام أحمد 26 نوفمبر، تقريبي).
+        psBakita.push({ unit: nm, label: 'باكيتا باب: قايم (الدلفة − 9) — تقريبي', len: alumRound2(dh - 9), qty: 2 * n });
+        psBakita.push({ unit: nm, label: 'باكيتا باب: عرض أرضية (الدلفة − 9) — تقريبي', len: alumRound2(dw - 9), qty: n });
+        psBakita.push({ unit: nm, label: 'باكيتا باب: عرض (الدلفة − 9 − 4) — تقريبي', len: alumRound2(dw - 13), qty: 5 * n });
+      } else {
+        psJalsa.push({ unit: nm, label: 'جلسة: واحد في النص (الدلفة − 9)', len: alumRound2(dw - 9), qty: n });
+        psJalsa.push({ unit: nm, label: 'جلسة: واحد تحت (الدلفة − 9)', len: alumRound2(dw - 9), qty: n });
+      }
     }
   });
 
@@ -462,6 +503,11 @@ function alumCompute(state, s) {
     psScreen: alumProfile(psScreen, s.stockLen, s.kerf),
     psSaddad: alumProfile(psSaddad, s.stockLen, s.kerf),
     psT: alumProfile(psT, s.stockLen, s.kerf),
+    psSashZOpen: alumProfile(psSashZOpen, s.stockLen, s.kerf),
+    psPandaZClosed: alumProfile(psPandaZClosed, s.stockLen, s.kerf),
+    psScreenFixed: alumProfile(psScreenFixed, s.stockLen, s.kerf),
+    psBakita: alumProfile(psBakita, s.stockLen, s.kerf),
+    psJalsa: alumProfile(psJalsa, s.stockLen, s.kerf),
     glass: glass,
     invalid: invalid,
     pending: pending
@@ -484,6 +530,10 @@ function alumMigratePsRow(p) {
   if (!q.frame) q.frame = 'std';
   if (!q.sash) q.sash = 'closed';
   if (!q.sashes) q.sashes = '2';
+  if (!q.panda) q.panda = 'no';
+  if (!q.pandaZ) q.pandaZ = 'closed';
+  if (q.t === 'big' || q.t === 'small') q.t = 'yes';
+  if (!q.t) q.t = 'yes';
   return q;
 }
 function alumLoad() {
@@ -679,7 +729,7 @@ function alumPsRow(p, j) {
   function onSelect(key) {
     return function (v) {
       p[key] = v; alumSave();
-      if (key === 'kind') alumRenderPs();
+      if (key === 'kind' || key === 'sashes' || key === 'panda' || key === 'pandaZ' || key === 'sash') alumRenderPs();
       alumRenderResults();
     };
   }
@@ -690,8 +740,18 @@ function alumPsRow(p, j) {
   if (p.kind === 'hinge') {
     row.appendChild(alumSelectField('عدد الدلف', p.sashes, [['2', 'درفتين'], ['1', 'درفة واحدة']], onSelect('sashes')));
   }
-  if (p.kind === 'hinge' || p.kind === 'door') {
+  if (p.kind === 'hinge') {
+    row.appendChild(alumSelectField('باندا', p.panda === 'yes' ? 'yes' : 'no', [['no', 'من غير باندا'], ['yes', 'باندا (دلفة جوه دلفة)']], onSelect('panda')));
+    if (p.panda === 'yes') {
+      row.appendChild(alumSelectField('قطاع الباندا', p.pandaZ === 'open' ? 'open' : 'closed', [['closed', 'Z مقفول'], ['open', 'Z مفتوح (باكيتا)']], onSelect('pandaZ')));
+    }
+  }
+  var pandaOn = p.kind === 'hinge' && p.panda === 'yes';
+  if ((p.kind === 'hinge' && !pandaOn) || p.kind === 'door') {
     row.appendChild(alumSelectField('قطاع الدلفة', p.sash, [['closed', 'مقفول'], ['open', 'مفتوح']], onSelect('sash')));
+  }
+  if (p.kind === 'door' && p.sash === 'open') {
+    row.appendChild(alumSelectField('T', p.t === 'none' ? 'none' : 'yes', [['yes', 'يوجد T'], ['none', 'لا يوجد']], onSelect('t')));
   }
   row.appendChild(alumField('العرض (سم)', p.w || '', function (v) { p.w = v; alumSave(); alumRenderResults(); }, true));
   row.appendChild(alumField('الارتفاع (سم)', p.h || '', function (v) { p.h = v; alumSave(); alumRenderResults(); }, true));
@@ -706,13 +766,13 @@ function alumRenderPs() {
   var host = document.getElementById('alum-ps');
   host.innerHTML = '';
   if (alumState.ps.length === 0) {
-    host.appendChild(alumEl('p', 'alum-caption', 'ضيف شباك أو باب بمقاساته. الجرار والمفصلي الدرفة الواحدة بيتحسبوا بمعادلاتك، والمفصلي الدرفتين للمثال 100×100 والباب للمثال 70×200 لحد تأكيد الخصومات. كل شغل لازم له حلق (+12 سم للتخصيم، وقايم الباب +7). عدد دلف السلك من الإعدادات (افتراضي 1).'));
+    host.appendChild(alumEl('p', 'alum-caption', 'ضيف شباك أو باب بمقاساته. الجرار والمفصلي الدرفة الواحدة بيتحسبوا بمعادلاتك، والمفصلي الدرفتين للمثال 100×100 والباب للمثال 70×200 لحد تأكيد الخصومات. كل شغل لازم له حلق (+12 سم للتخصيم، وقايم الباب +7). عدد دلف السلك من الإعدادات (افتراضي 1). والمفصلي (درفة أو درفتين) فيه اختيار باندا: بيحسب درفة الباندا (الدرفة − 7.7) والزجاج عليها والسلك الثابت (الباندا − 1). قطاع الباندا Z مقفول بيجي بالباكيتا (مفيش حساب)، وZ مفتوح بيتحسب باكيتا (الباندا − 9 تقريبي). والباب دلفته مفتوحة بيتحسب باكيتا (الدلفة − 9 تقريبي) ولو في T عود مونيه T، ودلفته مقفولة بيتحسب عود جلسة من غير باكيتا.'));
   }
   alumState.ps.forEach(function (p, j) { host.appendChild(alumPsRow(p, j)); });
   var addP = alumEl('button', 'alum-btn-secondary', 'أضف شباك/باب');
   addP.type = 'button';
   addP.addEventListener('click', function () {
-    alumState.ps.push({ kind: 'slide', frame: 'std', sash: 'closed', sashes: '2', w: '', h: '', qty: '1' });
+    alumState.ps.push({ kind: 'slide', frame: 'std', sash: 'closed', sashes: '2', panda: 'no', pandaZ: 'closed', t: 'yes', w: '', h: '', qty: '1' });
     alumSave(); alumRenderPs();
   });
   host.appendChild(addP);
@@ -722,7 +782,7 @@ function alumFillDrawerHint(hint, u) {
   var d = alumNum(u.depth);
   var s = alumCurrentSettings();
   hint.innerHTML = '';
-  if (d <= 0) { hint.style.display = 'none'; return; }
+  if (d <= 0 || alumResultsLocked()) { hint.style.display = 'none'; return; }
   hint.style.display = '';
   hint.appendChild(document.createTextNode('عمق الدرج = '));
   hint.appendChild(alumEl('b', null, alumFmt(alumRound2(d - s.drawerDepthDeduct)) + ' سم'));
@@ -739,10 +799,10 @@ function alumRefreshDrawerHints() {
 function alumTotalsSection(host, r, s) {
   // العمود الخامس: القطاع مؤكد ولا لسه مستني تأكيد أحمد (الأرفف والأدراج عدد قطعهم 2+2 غير مؤكد)
   var rows = [
-    ['العظم (الفريم والفواصل)', r.frame, s.stockLen, true, true],
-    ['الضلف', r.doors, s.stockLen, true, true],
-    ['الأرفف (غير مؤكد — مش داخل في الإجمالي)', r.shelves, s.stockLen, true, false],
-    ['الأدراج (غير مؤكد — مش داخل في الإجمالي)', r.drawers, s.stockLen, true, false],
+    ['العظم (الفريم والفواصل)', r.frame, s.stockLen, false, true],
+    ['الضلف', r.doors, s.stockLen, false, true],
+    ['الأرفف (غير مؤكد — مش داخل في الإجمالي)', r.shelves, s.stockLen, false, false],
+    ['الأدراج (غير مؤكد — مش داخل في الإجمالي)', r.drawers, s.stockLen, false, false],
     ['المقابض (بلت إن)', r.handles, s.handleStock, false, true],
     ['PS حلق جرار', r.psFrameSlide, s.stockLen, false, true],
     ['PS حلق معدول', r.psFrameStd, s.stockLen, false, true],
@@ -753,7 +813,12 @@ function alumTotalsSection(host, r, s) {
     ['PS سكينة', r.psKnife, s.stockLen, false, true],
     ['PS درفة سلك', r.psScreen, s.stockLen, false, true],
     ['PS صداد', r.psSaddad, s.stockLen, false, true],
-    ['PS قطاع T', r.psT, s.stockLen, false, true]
+    ['عود المونيه T', r.psT, s.stockLen, false, true],
+    ['عود الجلسة', r.psJalsa, s.stockLen, false, true],
+    ['PS دلفة Z مفتوح (شباك باندا — الدرفة ومعاها الباندا المفتوحة)', r.psSashZOpen, s.stockLen, false, true],
+    ['PS دلفة Z مقفول — الباندا', r.psPandaZClosed, s.stockLen, false, true],
+    ['PS السلك الثابت', r.psScreenFixed, s.stockLen, false, true],
+    ['PS باكيتا', r.psBakita, s.stockLen, false, true]
   ];
   var shown = rows.filter(function (row) { return row[3] || row[1].barCount > 0; });
   var confirmed = rows.filter(function (row) { return row[4]; });
@@ -862,7 +927,6 @@ function alumGlassSection(host, glass) {
   badge.style.background = '#8a8a8a';
   head.appendChild(badge);
   box.appendChild(head);
-  box.appendChild(alumEl('p', 'alum-caption', 'مقاس قص الزجاج = مقاس الدرفة − 9.4 سم لكل بعد، والعدد بعدد الدلف — متثبت من أمثلتك (100×100 درفتين و50×100 درفة واحدة) بس، وأي مقاس تاني مستني تأكيد خصم الزجاج.'));
   var table = alumEl('table');
   var headRow = alumEl('tr');
   ['الشباك', 'العرض (سم)', 'الارتفاع (سم)', 'العدد'].forEach(function (t) {
@@ -881,9 +945,32 @@ function alumGlassSection(host, glass) {
   host.appendChild(box);
 }
 
+function alumResultsLocked() {
+  // Inside the trial APK (WebView "wv") fail closed: a missing or throwing
+  // bridge means locked. The standalone web page (no WebView) stays unlocked.
+  var inApp = /\bwv\b/.test(navigator.userAgent || '');
+  try {
+    if (window.AlumNative && typeof window.AlumNative.resultsLocked === 'function') {
+      return !!window.AlumNative.resultsLocked();
+    }
+    return inApp;
+  } catch (e) { return inApp; }
+}
 function alumRenderResults() {
   var host = document.getElementById('alum-results');
   host.innerHTML = '';
+  if (alumResultsLocked()) {
+    // Subscription not active: results are never computed or rendered.
+    // Inputs and saved data are untouched.
+    host.setAttribute('data-locked', '1');
+    var lk = alumEl('div', 'alum-warn');
+    lk.appendChild(alumEl('b', null, 'النتايج مقفولة — الاشتراك منتهي'));
+    lk.appendChild(alumEl('div', null, 'مقاساتك محفوظة ولسه تقدر تعدّلها. النتايج وقائمة القص وتصدير PDF بترجع بعد تجديد الاشتراك. للتجديد: 01101083878'));
+    host.appendChild(lk);
+    var pr = document.getElementById('alum-print'); if (pr) pr.innerHTML = '';
+    return;
+  }
+  host.removeAttribute('data-locked');
   if (alumState.units.length === 0 && alumState.ps.length === 0) return;
   var s = alumCurrentSettings();
   var r = alumCompute(alumState, s);
@@ -908,19 +995,24 @@ function alumRenderResults() {
   alumTotalsSection(host, r, s);
   alumProfileSection(host, 'قطاع العظم (الفريم والفواصل)', r.frame, null, '#4f8f7b');
   alumProfileSection(host, 'قطاع الضلف', r.doors, null, '#d98a4e');
-  alumProfileSection(host, 'الأرفف', r.shelves, 'القطاع بتاع الرف وعدد قطعه (2 عرض + 2 عمق) لسه محتاجين تأكيدك — النتايج هنا للتوزيع بس، ومش داخلة في التوتال الكامل.', '#7a7fc0');
-  alumProfileSection(host, 'قطاع الأدراج علبة 2×8', r.drawers, 'عدد قطع الدرج (2 عرض + 2 عمق) محتاج تأكيدك — النتايج هنا للتوزيع بس، ومش داخلة في التوتال الكامل.', '#c0657a');
-  alumProfileSection(host, 'قطاع المقابض (بلت إن — أعواد ' + alumFmt(s.handleStock) + ' سم)', r.handles, 'مقبض واحد لكل ضلفة بلت إن بعرض الضلفة، حسب كلامك.', '#3f6d5d');
-  alumProfileSection(host, 'PS حلق جرار', r.psFrameSlide, 'الحلق لازم لكل شغل: كل قطعة = مقاس الشباك + 12 سم للتخصيم — من كلامك.', '#5a8a6a');
-  alumProfileSection(host, 'PS حلق معدول', r.psFrameStd, 'الشبابيك: كل قطعة = المقاس + 12 سم للتخصيم. الأبواب: الرأس = العرض + 12 والقايمين = الارتفاع + 7 ومفيش أرضية — من كلامك.', '#4f7f8f');
-  alumProfileSection(host, 'PS حلق مقلوب', r.psFrameRev, 'الشبابيك: كل قطعة = المقاس + 12 سم للتخصيم. الأبواب: الرأس = العرض + 12 والقايمين = الارتفاع + 7 ومفيش أرضية — من كلامك.', '#7a6a9a');
-  alumProfileSection(host, 'PS دلفة جرار', r.psSashSlide, 'معادلاتك المؤكدة: عرض الدرفة = (العرض + 1.5) ÷ 2 من غير تقريب، والارتفاع = الارتفاع − 6.5 سم، وكل درفة قطعتين لكل مقاس.', '#6a79c9');
-  alumProfileSection(host, 'PS قطاع دلفة مقفول', r.psSashClosed, 'المفصلي درفتين: بيتحسب للمثال 100×100 بس (مرجع من كلامك: 47.6 / 95.8) لحد تأكيد الخصومات العامة. درفة واحدة: خصم 4.2 من العرض والارتفاع (من كلامك). الباب: بيتحسب للمثال 70×200 بس (الارتفاع − 3.5 والعرض − 4.2 رأس بس) لحد تأكيد الخصومات.', '#6a79c9');
-  alumProfileSection(host, 'PS قطاع دلفة مفتوح', r.psSashOpen, 'المفصلي درفتين: بيتحسب للمثال 100×100 بس (مرجع من كلامك: 47.6 / 95.8) لحد تأكيد الخصومات العامة. درفة واحدة: خصم 4.2 من العرض والارتفاع (من كلامك). الباب: بيتحسب للمثال 70×200 بس (الارتفاع − 3.5 والعرض − 4.2 رأس بس) لحد تأكيد الخصومات.', '#9a6fc9');
+  alumProfileSection(host, 'الأرفف', r.shelves, null, '#7a7fc0');
+  alumProfileSection(host, 'قطاع الأدراج علبة 2×8', r.drawers, null, '#c0657a');
+  alumProfileSection(host, 'قطاع المقابض (بلت إن — أعواد ' + alumFmt(s.handleStock) + ' سم)', r.handles, null, '#3f6d5d');
+  alumProfileSection(host, 'PS حلق جرار', r.psFrameSlide, null, '#5a8a6a');
+  alumProfileSection(host, 'PS حلق معدول', r.psFrameStd, null, '#4f7f8f');
+  alumProfileSection(host, 'PS حلق مقلوب', r.psFrameRev, null, '#7a6a9a');
+  alumProfileSection(host, 'PS دلفة جرار', r.psSashSlide, null, '#6a79c9');
+  alumProfileSection(host, 'PS قطاع دلفة مقفول', r.psSashClosed, null, '#6a79c9');
+  alumProfileSection(host, 'PS قطاع دلفة مفتوح', r.psSashOpen, null, '#9a6fc9');
   alumProfileSection(host, 'PS سكينة', r.psKnife, null, '#3f9e8f');
-  alumProfileSection(host, 'PS درفة سلك', r.psScreen, 'نفس عرض الدرفة العادية، والارتفاع = الارتفاع − 6.2 سم حسب كلامك. عدد دلف السلك لكل شباك من الإعدادات (افتراضي 1).', '#c99a3f');
-  alumProfileSection(host, 'PS صداد', r.psSaddad, 'عود صداد واحد للشباك المفصلي الدرفتين = الارتفاع − 10.4 — من مثالك 100×100، محتاج تأكيدك.', '#b05a70');
-  alumProfileSection(host, 'PS قطاع T', r.psT, 'قطعتين بعرض درفة الباب من مثالك 70×200 بس — بيتقصوا وبيتظبطوا على الطبيعة (يصفي للطبيعة) حسب كلامك. أي مقاس باب تاني مستني تأكيد الخصومات.', '#8a7a5a');
+  alumProfileSection(host, 'PS درفة سلك', r.psScreen, null, '#c99a3f');
+  alumProfileSection(host, 'PS صداد', r.psSaddad, null, '#b05a70');
+  alumProfileSection(host, 'عود المونيه T', r.psT, null, '#8a7a5a');
+  alumProfileSection(host, 'PS دلفة Z مفتوح (شباك باندا — الدرفة ومعاها الباندا المفتوحة)', r.psSashZOpen, null, '#4f9a7f');
+  alumProfileSection(host, 'PS دلفة Z مقفول — الباندا', r.psPandaZClosed, null, '#3f8f6a');
+  alumProfileSection(host, 'PS السلك الثابت', r.psScreenFixed, null, '#c98a3f');
+  alumProfileSection(host, 'PS باكيتا', r.psBakita, null, '#a05a8a');
+  alumProfileSection(host, 'عود الجلسة', r.psJalsa, null, '#7a8a5a');
   alumGlassSection(host, r.glass);
 }
 
@@ -942,6 +1034,7 @@ function alumBuildPrintArea() {
   }
 }
 function alumExportPdf() {
+  if (alumResultsLocked()) { alert('تصدير النتايج مقفول لأن الاشتراك منتهي.'); return; }
   alumBuildPrintArea();
   if (window.AlumNative && typeof window.AlumNative.printPdf === 'function') {
     window.AlumNative.printPdf('alumetal-cutting');
